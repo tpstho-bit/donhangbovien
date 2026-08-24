@@ -1,0 +1,47 @@
+name: Sign APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v -keystore release.keystore -alias bovien \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass "BoVien2026!" -keypass "BoVien2026!" \
+            -dname "CN=Hoang Kute, OU=BoVienGiaTruyen, O=BoVienGiaTruyen, L=HoChiMinh, ST=HoChiMinh, C=VN"
+
+      - name: Find build-tools path
+        run: echo "BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)" >> $GITHUB_ENV
+
+      - name: Zipalign
+        run: "${{ env.BUILD_TOOLS }}zipalign -f -p 4 BoVien-unsigned.apk aligned.apk"
+
+      - name: Sign with apksigner
+        run: |
+          ${{ env.BUILD_TOOLS }}apksigner sign \
+            --ks release.keystore --ks-pass pass:BoVien2026! --ks-key-alias bovien \
+            --out BoVien-signed.apk aligned.apk
+
+      - name: Verify signature
+        run: "${{ env.BUILD_TOOLS }}apksigner verify --verbose BoVien-signed.apk"
+
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoVien-signed-apk
+          path: BoVien-signed.apk
